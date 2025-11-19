@@ -1,16 +1,17 @@
 import requests
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # curl --location -g 'http://localhost:8000/api/v1/recognition/subjects' \
 # --header 'x-api-key: 2914a5ba-e243-402d-a535-37f361ed1bf2'
 url = "http://localhost:8000/api/v1/verification/verify?limit=0&det_prob_threshold=0.8&face_plugins=landmarks%2C%20gender%2C%20age%2C%20calculator%2C%20mask%2C%20pose&status=true"
 
-# headers = {
-#     "Content-Type": "application/json",
-#     "x-api-key": "2914a5ba-e243-402d-a535-37f361ed1bf2"
-# }
 headers = {
     "Content-Type": "application/json",
-    "x-api-key": "32c5018b-fb21-4fef-9c0a-5b6177a0c1ac"
+    "x-api-key": os.getenv("VITE_VERIFICATION_API_KEY")
 }
 
 # # Source - https://stackoverflow.com/a

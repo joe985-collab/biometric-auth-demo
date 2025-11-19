@@ -12,9 +12,8 @@ import './index.css';
 // Mock API calls
 
 // Define your variables
-const baseUrl = 'http://localhost:8000'
-const apiKey = '2914a5ba-e243-402d-a535-37f361ed1bf2';
-const base64String = 'YOUR_CLEAN_BASE64_STRING'; // The part AFTER the comma
+const baseUrl = import.meta.env.VITE_API_BASE_URL;
+const apiKey = import.meta.env.VITE_RECOGNITION_API_KEY;
 
 const url = `${baseUrl}/api/v1/recognition/faces?subject=1`;
 
@@ -25,7 +24,7 @@ const requestOptions = {
     'x-api-key': apiKey
   },
   body: JSON.stringify({
-    file: base64String
+    file: ""
   })
 };
 
