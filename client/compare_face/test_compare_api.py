@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # curl --location -g 'http://localhost:8000/api/v1/recognition/subjects' \
-# --header 'x-api-key: 2914a5ba-e243-402d-a535-37f361ed1bf2'
 url = "http://localhost:8000/api/v1/verification/verify?limit=0&det_prob_threshold=0.8&face_plugins=landmarks%2C%20gender%2C%20age%2C%20calculator%2C%20mask%2C%20pose&status=true"
 
 headers = {
