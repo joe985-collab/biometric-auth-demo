@@ -14,8 +14,8 @@ import './index.css';
 // Define your variables
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
 const apiKey = import.meta.env.VITE_RECOGNITION_API_KEY;
+const backendUrl = import.meta.env.VITE_BACKEND_BASE_URL;
 
-const url = `${baseUrl}/api/v1/recognition/faces?subject=1`;
 
 const requestOptions = {
   method: 'POST',
@@ -29,17 +29,47 @@ const requestOptions = {
 };
 
 // Execute the request
-fetch(url, requestOptions)
-  .then(response => response.json())
-  .then(result => console.log(result))
-  .catch(error => console.error('Error:', error));
 
-const registerFace = async (imageData: string, username: string): Promise<any> => {
+
+
+const handleData = async function handleData(url: RequestInfo | URL, requestOptions: RequestInit | undefined, formData?: { username: string; password: string }) {
+  try {
+    const res1 = await fetch(url, requestOptions);
+    const data1 = await res1.json();
+    // console.log("data1: ", data1.result[0].embedding);
+
+    // If formData is provided, store it in the database
+    if (formData) {
+      console.log("Form data to store in DB:", formData);
+      // TODO: Add database storage logic here
+      const res2 = await fetch(backendUrl + "/store", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          password: formData.password,
+          embedding: data1.result[0].embedding.map(Number),
+        }),
+      })
+      // You can make another API call to your backend to store username, password, and embedding
+    }
+
+    return { success: true, message: 'Face registered successfully' };
+  } catch (error) {
+    console.error('Error:', error);
+    return { success: false, message: 'Error registering face' };
+  }
+}
+const registerFace = async (imageData: string, username: string, password: string): Promise<any> => {
   const base64String = imageData.split(',')[1]; // The part AFTER the comma
   const subjectId = crypto.randomUUID();
 
   console.log("base64String: ", base64String)
-  const url = `${baseUrl}/api/v1/recognition/faces?subject=${subjectId}`;
+  // const url = `${baseUrl}/api/v1/recognition/faces?subject=${subjectId}`;
+
+  const url = `${baseUrl}/api/v1/recognition/recognize?limit=0&det_prob_threshold=0.8&prediction_count=1&face_plugins=landmarks%2C%20gender%2C%20age%2C%20calculator%2C%20mask%2C%20pose&status=true`;
 
   const requestOptions = {
     method: 'POST',
@@ -52,11 +82,9 @@ const registerFace = async (imageData: string, username: string): Promise<any> =
     })
   };
 
-  // Execute the request
-  fetch(url, requestOptions)
-    .then(response => response.json())
-    .then(result => console.log(result))
-    .catch(error => console.error('Error:', error));
+  // Execute the request with form data
+  const formData = { username, password };
+  return handleData(url, requestOptions, formData);
 };
 
 const loginFace = async (imageData: string): Promise<any> => {
@@ -71,6 +99,7 @@ const loginFace = async (imageData: string): Promise<any> => {
 function App() {
   const [currentView, setCurrentView] = useState<'home' | 'register' | 'login' | 'dashboard'>('home');
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [message, setMessage] = useState<MessageType>({ text: '', type: '' });
@@ -112,11 +141,12 @@ function App() {
   const captureImage = () => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
-
+    console.log("Inside capture image..")
     if (canvas && video) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
+      console.log("ctx: ", ctx)
       if (ctx) {
         ctx.drawImage(video, 0, 0);
         setCapturedImage(canvas.toDataURL('image/jpeg'));
@@ -132,6 +162,7 @@ function App() {
 
   const clearForm = () => {
     setUsername('');
+    setPassword('');
     setCapturedImage(null);
     setMessage({ text: '', type: '' });
   };
@@ -141,6 +172,10 @@ function App() {
       setMessage({ text: 'Please enter a username', type: 'error' });
       return;
     }
+    if (!password.trim()) {
+      setMessage({ text: 'Please enter a password', type: 'error' });
+      return;
+    }
     if (!capturedImage) {
       setMessage({ text: 'Please capture your face', type: 'error' });
       return;
@@ -148,8 +183,8 @@ function App() {
 
     try {
       setMessage({ text: 'Registering...', type: 'info' });
-      const result = await registerFace(capturedImage, username);
-
+      const result = await registerFace(capturedImage, username, password);
+      console.log("Registration result: ", result);
       if (result.success) {
         setMessage({ text: 'Registration successful! You can now login.', type: 'success' });
         setTimeout(() => {
@@ -222,16 +257,22 @@ function App() {
           {currentView === 'register' && (
             <Register
               username={username}
+              password={password}
               capturedImage={capturedImage}
               message={message}
               isCapturing={isCapturing}
               onUsernameChange={(e) => setUsername(e.target.value)}
+              onPasswordChange={(e) => setPassword(e.target.value)}
               onStartCamera={startCamera}
               onStopCamera={stopCamera}
               onCapture={captureImage}
               onRetake={retakePhoto}
               onRegister={handleRegister}
-              onBack={() => setCurrentView('home')}
+              onBack={() => {
+                stopCamera();
+                clearForm();
+                setCurrentView('home');
+              }}
               videoRef={videoRef}
               canvasRef={canvasRef}
               streamRef={streamRef}
@@ -248,7 +289,11 @@ function App() {
               onCapture={captureImage}
               onRetake={retakePhoto}
               onLogin={handleLogin}
-              onBack={() => setCurrentView('home')}
+              onBack={() => {
+                stopCamera();
+                clearForm();
+                setCurrentView('home');
+              }}
               videoRef={videoRef}
               canvasRef={canvasRef}
             />

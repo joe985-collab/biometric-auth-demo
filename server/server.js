@@ -2,10 +2,11 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import pg from "pg";
-
+import bcrypt from "bcrypt";
 dotenv.config();
 
 const app = express();
+const created_at = new Date();
 app.use(cors());
 app.use(express.json());
 
@@ -18,17 +19,22 @@ const db = new pg.Pool({
 });
 
 // Login example
-app.post("/login", async (req, res) => {
+app.post("/store", async (req, res) => {
   //   const { email, password } = req.body;
+  console.log("response: ", req.body)
+  console.log("Type:", typeof req.body.embedding);
+  console.log(req.body.embedding.slice(0, 5));
 
+  const hashedPassword = await bcrypt.hash(req.body.password, 10);
   const result = await db.query(
-    "SELECT * FROM users;"
+    "INSERT INTO users (username, password_hash, face_embedding, created_at) VALUES ($1, $2, $3, $4);",
+    [req.body.username, hashedPassword, JSON.stringify(req.body.embedding), created_at]
   );
-  console.log("Here")
-  if (result.rows.length === 0) {
-    // return res.status(401).json({ message: "Invalid credentials" });
-    return res.status(401).json({ message: "Invalid credentials" });
-  }
+  // console.log("Here")
+  // if (result.rows.length === 0) {
+  //   // return res.status(401).json({ message: "Invalid credentials" });
+  //   return res.status(401).json({ message: "Invalid credentials" });
+  // }
 
   res.json({ message: "Logged in!", user: result.rows[0] });
 });

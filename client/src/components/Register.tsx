@@ -6,10 +6,12 @@ import { Message as MessageType } from '../types';
 
 interface RegisterProps {
   username: string;
+  password: string;
   capturedImage: string | null;
   message: MessageType;
   isCapturing: boolean;
   onUsernameChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onPasswordChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onStartCamera: () => void;
   onStopCamera: () => void;
   onCapture: () => void;
@@ -23,10 +25,12 @@ interface RegisterProps {
 
 export const Register: React.FC<RegisterProps> = ({
   username,
+  password,
   capturedImage,
   message,
   isCapturing,
   onUsernameChange,
+  onPasswordChange,
   onStartCamera,
   onStopCamera,
   onCapture,
@@ -58,6 +62,17 @@ export const Register: React.FC<RegisterProps> = ({
           value={username}
           onChange={onUsernameChange}
           placeholder="Enter username"
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <div className="mb-4">
+        <label className="block text-gray-700 font-medium mb-2">Password</label>
+        <input
+          type="password"
+          value={password}
+          onChange={onPasswordChange}
+          placeholder="Enter password"
           className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
         />
       </div>
