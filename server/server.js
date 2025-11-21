@@ -19,6 +19,17 @@ const db = new pg.Pool({
 });
 
 // Login example
+app.post("/retrieve_users", async (req, res) => {
+  try {
+    console.log("embedding: ",req.body.embedding)
+    // const result = await db.query("SELECT * FROM users;");
+    // res.json(result.rows);
+  } catch (error) {
+    console.error("Error retrieving users:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+})
+
 app.post("/store", async (req, res) => {
   //   const { email, password } = req.body;
   console.log("response: ", req.body)

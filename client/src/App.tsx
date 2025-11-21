@@ -30,7 +30,22 @@ const requestOptions = {
 
 // Execute the request
 
-
+const retrieveData = async function retrieveData(url: RequestInfo | URL, requestOptions: RequestInit | undefined){
+    const res1 = await fetch(url,requestOptions);
+    const data1 = await res1.json();
+    console.log("Hiiiiiii")
+    const res2 =  await fetch(backendUrl + "/retrieve_users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          embedding: data1.result[0].embedding.map(Number),
+        }),
+      })
+    return { success: true, message: 'Face logged in successfully' };
+  
+}
 
 const handleData = async function handleData(url: RequestInfo | URL, requestOptions: RequestInit | undefined, formData?: { username: string; password: string }) {
   try {
@@ -64,7 +79,7 @@ const handleData = async function handleData(url: RequestInfo | URL, requestOpti
 }
 const registerFace = async (imageData: string, username: string, password: string): Promise<any> => {
   const base64String = imageData.split(',')[1]; // The part AFTER the comma
-  const subjectId = crypto.randomUUID();
+  // const subjectId = crypto.randomUUID();
 
   console.log("base64String: ", base64String)
   // const url = `${baseUrl}/api/v1/recognition/faces?subject=${subjectId}`;
@@ -88,12 +103,25 @@ const registerFace = async (imageData: string, username: string, password: strin
 };
 
 const loginFace = async (imageData: string): Promise<any> => {
-  const response = await fetch(``, {
+  const base64String = imageData.split(',')[1]; // The part AFTER the comma
+  // const subjectId = crypto.randomUUID();
+
+  console.log("base64String: ", base64String)
+  // const url = `${baseUrl}/api/v1/recognition/faces?subject=${subjectId}`;
+
+  const url = `${baseUrl}/api/v1/recognition/recognize?limit=0&det_prob_threshold=0.8&prediction_count=1&face_plugins=landmarks%2C%20gender%2C%20age%2C%20calculator%2C%20mask%2C%20pose&status=true`;
+
+  const requestOptions = {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: imageData })
-  });
-  return response.json();
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey
+    },
+    body: JSON.stringify({
+      file: base64String
+    })
+  };
+  return retrieveData(url,requestOptions)
 };
 
 function App() {
@@ -204,6 +232,9 @@ function App() {
   };
 
   const handleLogin = async () => {
+    
+    console.log("Inside login logic..... ")
+
     if (!capturedImage) {
       setMessage({ text: 'Please capture your face', type: 'error' });
       return;
