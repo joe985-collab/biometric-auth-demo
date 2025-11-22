@@ -30,28 +30,28 @@ const requestOptions = {
 
 // Execute the request
 
-const retrieveData = async function retrieveData(url: RequestInfo | URL, requestOptions: RequestInit | undefined){
-    const res1 = await fetch(url,requestOptions);
-    const data1 = await res1.json();
-    console.log("Hiiiiiii")
-    const res2 =  await fetch(backendUrl + "/retrieve_users", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          embedding: data1.result[0].embedding.map(Number),
-        }),
-      })
-    return { success: true, message: 'Face logged in successfully' };
-  
+const retrieveData = async function retrieveData(url: RequestInfo | URL, requestOptions: RequestInit | undefined) {
+  const res1 = await fetch(url, requestOptions);
+  const data1 = await res1.json();
+  const res2 = await fetch(backendUrl + "/retrieve_users", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      embedding: data1.result[0].embedding.map(Number),
+    }),
+  })
+  const data2 = await res2.json();
+  return { success: true, username:data2.result.username, message: 'Face logged in successfully' };
+
 }
 
 const handleData = async function handleData(url: RequestInfo | URL, requestOptions: RequestInit | undefined, formData?: { username: string; password: string }) {
   try {
     const res1 = await fetch(url, requestOptions);
     const data1 = await res1.json();
-    // console.log("data1: ", data1.result[0].embedding);
+    console.log("data1: ", data1);
 
     // If formData is provided, store it in the database
     if (formData) {
@@ -65,7 +65,7 @@ const handleData = async function handleData(url: RequestInfo | URL, requestOpti
         body: JSON.stringify({
           username: formData.username,
           password: formData.password,
-          embedding: data1.result[0].embedding.map(Number),
+          embedding: data1.result.map((item: { embedding: any; }) => item.embedding),
         }),
       })
       // You can make another API call to your backend to store username, password, and embedding
@@ -121,7 +121,7 @@ const loginFace = async (imageData: string): Promise<any> => {
       file: base64String
     })
   };
-  return retrieveData(url,requestOptions)
+  return retrieveData(url, requestOptions)
 };
 
 function App() {
@@ -129,10 +129,20 @@ function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [capturedSelfies, setCapturedSelfies] = useState<string[]>([]);
+  const [currentStep, setCurrentStep] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const [message, setMessage] = useState<MessageType>({ text: '', type: '' });
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
+
+  const instructions = [
+    "Take a photo of your Front Profile",
+    "Turn your head Left and take a photo",
+    "Turn your head Right and take a photo",
+    "Remove specs (if any) and take a Front photo",
+    "Come Closer to the camera and take a photo"
+  ];
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -177,14 +187,47 @@ function App() {
       console.log("ctx: ", ctx)
       if (ctx) {
         ctx.drawImage(video, 0, 0);
-        setCapturedImage(canvas.toDataURL('image/jpeg'));
-        stopCamera();
+        const newImage = canvas.toDataURL('image/jpeg');
+
+        if (currentView === 'register') {
+          const newSelfies = [...capturedSelfies, newImage];
+          setCapturedSelfies(newSelfies);
+
+          if (newSelfies.length === 5) {
+            // Stitch images
+            const stitchedCanvas = document.createElement('canvas');
+            stitchedCanvas.width = video.videoWidth * 5;
+            stitchedCanvas.height = video.videoHeight;
+            const stitchedCtx = stitchedCanvas.getContext('2d');
+
+            if (stitchedCtx) {
+              newSelfies.forEach((imgSrc, index) => {
+                const img = new Image();
+                img.src = imgSrc;
+                img.onload = () => {
+                  stitchedCtx.drawImage(img, index * video.videoWidth, 0);
+                  if (index === 4) { // Last image
+                    setCapturedImage(stitchedCanvas.toDataURL('image/jpeg'));
+                    stopCamera();
+                  }
+                };
+              });
+            }
+          } else {
+            setCurrentStep(prev => prev + 1);
+          }
+        } else {
+          setCapturedImage(newImage);
+          stopCamera();
+        }
       }
     }
   };
 
   const retakePhoto = () => {
     setCapturedImage(null);
+    setCapturedSelfies([]);
+    setCurrentStep(0);
     startCamera();
   };
 
@@ -192,6 +235,8 @@ function App() {
     setUsername('');
     setPassword('');
     setCapturedImage(null);
+    setCapturedSelfies([]);
+    setCurrentStep(0);
     setMessage({ text: '', type: '' });
   };
 
@@ -232,7 +277,7 @@ function App() {
   };
 
   const handleLogin = async () => {
-    
+
     console.log("Inside login logic..... ")
 
     if (!capturedImage) {
@@ -245,6 +290,7 @@ function App() {
       const result = await loginFace(capturedImage);
 
       if (result.success) {
+        console.log("result: ",result)
         setMessage({ text: `Welcome back, ${result.username}!`, type: 'success' });
         setCurrentUser(result.username || 'User');
         setTimeout(() => {
@@ -307,6 +353,10 @@ function App() {
               videoRef={videoRef}
               canvasRef={canvasRef}
               streamRef={streamRef}
+              currentStep={currentStep}
+              totalSteps={5}
+              instructions={instructions}
+              capturedSelfies={capturedSelfies}
             />
           )}
 

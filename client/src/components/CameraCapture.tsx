@@ -8,6 +8,7 @@ interface CameraCaptureProps {
   onRetake: () => void;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  captureButtonText?: string;
 }
 
 export const CameraCapture: React.FC<CameraCaptureProps> = ({
@@ -18,6 +19,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
   onRetake,
   videoRef,
   canvasRef,
+  captureButtonText = "Capture Photo",
 }) => {
   return (
     <div className="mb-4">
@@ -39,7 +41,7 @@ export const CameraCapture: React.FC<CameraCaptureProps> = ({
         )}
         {isCapturing && !capturedImage && (
           <button onClick={onCapture} className="w-full py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition">
-            Capture Photo
+            {captureButtonText}
           </button>
         )}
         {capturedImage && (
