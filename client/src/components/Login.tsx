@@ -13,6 +13,7 @@ interface LoginProps {
   onCapture: () => void;
   onRetake: () => void;
   onLogin: () => void;
+  onPasswordLogin: (username: string, password: string) => void;
   onBack: () => void;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -27,6 +28,7 @@ export const Login: React.FC<LoginProps> = ({
   onCapture,
   onRetake,
   onLogin,
+  onPasswordLogin,
   onBack,
   videoRef,
   canvasRef,
@@ -35,8 +37,7 @@ export const Login: React.FC<LoginProps> = ({
   const [password, setPassword] = useState('');
 
   const handlePasswordLogin = () => {
-    console.log("Login with password:", username, password);
-    // Backend logic excluded as per instructions
+    onPasswordLogin(username, password);
   };
 
   return (

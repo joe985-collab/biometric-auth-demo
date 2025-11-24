@@ -3,14 +3,6 @@ import { Home, Register, Login, Dashboard } from './components';
 import { Message as MessageType } from './types';
 import './index.css';
 
-// curl --location -g '{{compreface_base_url}}/api/v1/recognition/faces?subject=1' \
-// --header 'Content-Type: application/json' \
-// --header 'x-api-key: {{recognition_api_key}}' \
-// --data '{
-//   "file": "{{file_base64_value}}"
-// }'
-// Mock API calls
-
 // Define your variables
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
 const apiKey = import.meta.env.VITE_RECOGNITION_API_KEY;
@@ -31,33 +23,37 @@ const requestOptions = {
 // Execute the request
 
 const retrieveData = async function retrieveData(url: RequestInfo | URL, requestOptions: RequestInit | undefined) {
-  const res1 = await fetch(url, requestOptions);
-  const data1 = await res1.json();
-  const res2 = await fetch(backendUrl + "/retrieve_users", {
+  const recognitionResponse = await fetch(url, requestOptions);
+  const recognitionData = await recognitionResponse.json();
+
+  const backendResponse = await fetch(backendUrl + "/retrieve_users", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      embedding: data1.result[0].embedding.map(Number),
+      embedding: recognitionData.result[0].embedding.map(Number),
     }),
   })
-  const data2 = await res2.json();
-  return { success: true, username:data2.result.username, message: 'Face logged in successfully' };
+
+  if (backendResponse.status === 401) {
+    return { success: false, message: 'Unauthorized user' };
+  }
+
+  const backendData = await backendResponse.json();
+  return { success: true, username: backendData.result.username, message: 'Face logged in successfully' };
 
 }
 
 const handleData = async function handleData(url: RequestInfo | URL, requestOptions: RequestInit | undefined, formData?: { username: string; password: string }) {
   try {
-    const res1 = await fetch(url, requestOptions);
-    const data1 = await res1.json();
-    console.log("data1: ", data1);
+    const recognitionResponse = await fetch(url, requestOptions);
+    const recognitionData = await recognitionResponse.json();
 
     // If formData is provided, store it in the database
     if (formData) {
-      console.log("Form data to store in DB:", formData);
       // TODO: Add database storage logic here
-      const res2 = await fetch(backendUrl + "/store", {
+      const storeResponse = await fetch(backendUrl + "/store", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -65,7 +61,7 @@ const handleData = async function handleData(url: RequestInfo | URL, requestOpti
         body: JSON.stringify({
           username: formData.username,
           password: formData.password,
-          embedding: data1.result.map((item: { embedding: any; }) => item.embedding),
+          embedding: recognitionData.result.map((item: { embedding: any; }) => item.embedding),
         }),
       })
       // You can make another API call to your backend to store username, password, and embedding
@@ -73,7 +69,6 @@ const handleData = async function handleData(url: RequestInfo | URL, requestOpti
 
     return { success: true, message: 'Face registered successfully' };
   } catch (error) {
-    console.error('Error:', error);
     return { success: false, message: 'Error registering face' };
   }
 }
@@ -81,7 +76,6 @@ const registerFace = async (imageData: string, username: string, password: strin
   const base64String = imageData.split(',')[1]; // The part AFTER the comma
   // const subjectId = crypto.randomUUID();
 
-  console.log("base64String: ", base64String)
   // const url = `${baseUrl}/api/v1/recognition/faces?subject=${subjectId}`;
 
   const url = `${baseUrl}/api/v1/recognition/recognize?limit=0&det_prob_threshold=0.8&prediction_count=1&face_plugins=landmarks%2C%20gender%2C%20age%2C%20calculator%2C%20mask%2C%20pose&status=true`;
@@ -106,7 +100,6 @@ const loginFace = async (imageData: string): Promise<any> => {
   const base64String = imageData.split(',')[1]; // The part AFTER the comma
   // const subjectId = crypto.randomUUID();
 
-  console.log("base64String: ", base64String)
   // const url = `${baseUrl}/api/v1/recognition/faces?subject=${subjectId}`;
 
   const url = `${baseUrl}/api/v1/recognition/recognize?limit=0&det_prob_threshold=0.8&prediction_count=1&face_plugins=landmarks%2C%20gender%2C%20age%2C%20calculator%2C%20mask%2C%20pose&status=true`;
@@ -150,41 +143,56 @@ function App() {
 
   useEffect(() => () => stopCamera(), []);
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 }
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        setIsCapturing(true);
+  useEffect(() => {
+    const initCamera = async () => {
+      if (isCapturing && !streamRef.current) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 640, height: 480 }
+          });
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+        } catch (err) {
+          setMessage({ text: 'Camera access denied. Please allow camera permissions.', type: 'error' });
+          setIsCapturing(false);
+        }
+      } else if (!isCapturing && streamRef.current) {
+        // Cleanup is handled by stopCamera, but good to double check or handle unmounts
       }
-    } catch (err) {
-      setMessage({ text: 'Camera access denied. Please allow camera permissions.', type: 'error' });
+    };
+
+    initCamera();
+  }, [isCapturing]);
+
+  // Also need to ensure videoRef gets the stream if it mounts AFTER the stream is ready (though in this flow they happen together)
+  useEffect(() => {
+    if (isCapturing && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
     }
+  }, [isCapturing, videoRef.current]); // videoRef.current might not trigger update if ref object is stable but current changes? 
+  // Actually refs don't trigger re-renders. But the component re-renders when isCapturing changes.
+
+  const startCamera = () => {
+    setIsCapturing(true);
   };
 
   const stopCamera = () => {
-    console.log("streamRef.current: ", streamRef.current)
     if (streamRef.current) {
-      console.log("Inside if cond for streamRef")
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    console.log("Here stopCamera()")
     setIsCapturing(false);
   };
 
   const captureImage = () => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
-    console.log("Inside capture image..")
     if (canvas && video) {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       const ctx = canvas.getContext('2d');
-      console.log("ctx: ", ctx)
       if (ctx) {
         ctx.drawImage(video, 0, 0);
         const newImage = canvas.toDataURL('image/jpeg');
@@ -257,7 +265,6 @@ function App() {
     try {
       setMessage({ text: 'Registering...', type: 'info' });
       const result = await registerFace(capturedImage, username, password);
-      console.log("Registration result: ", result);
       if (result.success) {
         setMessage({ text: 'Registration successful! You can now login.', type: 'success' });
         setTimeout(() => {
@@ -278,7 +285,6 @@ function App() {
 
   const handleLogin = async () => {
 
-    console.log("Inside login logic..... ")
 
     if (!capturedImage) {
       setMessage({ text: 'Please capture your face', type: 'error' });
@@ -290,7 +296,6 @@ function App() {
       const result = await loginFace(capturedImage);
 
       if (result.success) {
-        console.log("result: ",result)
         setMessage({ text: `Welcome back, ${result.username}!`, type: 'success' });
         setCurrentUser(result.username || 'User');
         setTimeout(() => {
@@ -310,6 +315,43 @@ function App() {
     }
   };
 
+  const handlePasswordLogin = async (loginUsername: string, loginPassword: string) => {
+    if (!loginUsername.trim()) {
+      setMessage({ text: 'Please enter a username', type: 'error' });
+      return;
+    }
+    if (!loginPassword.trim()) {
+      setMessage({ text: 'Please enter a password', type: 'error' });
+      return;
+    }
+
+    try {
+      setMessage({ text: 'Authenticating...', type: 'info' });
+      const response = await fetch(backendUrl + '/password_login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setMessage({ text: `Welcome back, ${data.result.username}!`, type: 'success' });
+        setCurrentUser(data.result.username);
+        setTimeout(() => {
+          setIsAuthenticated(true);
+          setCurrentView('dashboard');
+        }, 1500);
+      } else {
+        setMessage({ text: data.message || 'Invalid credentials', type: 'error' });
+      }
+    } catch (err) {
+      setMessage({ text: 'Error connecting to server', type: 'error' });
+    }
+  };
+
   const handleLogout = () => {
     setIsAuthenticated(false);
     setCurrentUser(null);
@@ -324,9 +366,9 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 p-4">
-      <div className="max-w-md mx-auto mt-10">
-        <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 p-4 flex items-center justify-center font-sans">
+      <div className="w-full max-w-md">
+        <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden border border-white/20">
           {currentView === 'home' && (
             <Home onRegister={() => setCurrentView('register')} onLogin={() => setCurrentView('login')} />
           )}
@@ -370,6 +412,7 @@ function App() {
               onCapture={captureImage}
               onRetake={retakePhoto}
               onLogin={handleLogin}
+              onPasswordLogin={handlePasswordLogin}
               onBack={() => {
                 stopCamera();
                 clearForm();
